@@ -27,9 +27,9 @@ st.title("📚 Profiling Dosen (Google Scholar + Sinta + Scopus)")
 
 # --- Input Identitas Dosen ---
 scholar_url = st.text_input("Masukkan URL Google Scholar:",
-                            "https://scholar.google.com/citations?hl=id&user=fzCJZDAAAAAJ")
-sinta_id = st.text_input("Masukkan Sinta ID (opsional):", "6758820")
-scopus_id = st.text_input("Masukkan Scopus ID (opsional):", "")
+                            placeholder="https://scholar.google.com/citations?hl=id&user=fzCJZDAAAAAJ")
+sinta_id = st.text_input("Masukkan Sinta ID (opsional):", placeholder="6758820")
+scopus_id = st.text_input("Masukkan Scopus ID (opsional):", placeholder="57204106663")
 
 # =========================
 # List mata kuliah per prodi
