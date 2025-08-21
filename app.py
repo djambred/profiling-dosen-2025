@@ -155,28 +155,35 @@ if proses and competency_text:
         styles = getSampleStyleSheet()
         elements = []
 
-        if author:
-            elements.append(Paragraph(f"Profil Dosen: {author.get('name','-')}", styles['Title']))
-            elements.append(Spacer(1,12))
-            elements.append(Paragraph(f"Afiliasi: {author.get('affiliation','-')}", styles['Normal']))
-            elements.append(Paragraph(f"h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}", styles['Normal']))
-            elements.append(Spacer(1,12))
+        # Judul
+        elements.append(Paragraph("Profil Dosen: Nama Dosen", styles['Title']))
+        elements.append(Spacer(1,12))
+        elements.append(Paragraph("Afiliasi: Fakultas / Universitas", styles['Normal']))
+        elements.append(Paragraph("h-index: 10 | i10-index: 5", styles['Normal']))
+        elements.append(Spacer(1,12))
 
-        if df_results.shape[0] > 0:
-            table_data = [["Mata Kuliah","Kesesuaian (%)","Publikasi Relevan","Pernah Diajar"]]
-            for r in df_results.itertuples(index=False):
-                table_data.append([r[0], r[1], wrap_text(r[2], width=50), r[3]])
+        # Table Data
+        table_data = [["Mata Kuliah", "Kesesuaian (%)", "Publikasi Relevan", "Pernah Diajar"]]
 
-            col_widths = [120, 80, 250, 60]  # sesuaikan lebar kolom
-            table = Table(table_data, colWidths=col_widths)
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.grey),
-                ("TEXTCOLOR", (0,0), (-1,0), colors.whitesmoke),
-                ("ALIGN", (0,0), (-1,-1), "CENTER"),
-                ("VALIGN", (0,0), (-1,-1), "TOP"),
-                ("GRID", (0,0), (-1,-1), 1, colors.black)
-            ]))
-            elements.append(table)
+        # Contoh row
+        for r in df_results.itertuples(index=False):
+            table_data.append([
+                Paragraph(r[0], styles['Normal']),                # Mata Kuliah
+                Paragraph(str(r[1]), styles['Normal']),          # Kesesuaian
+                Paragraph(r[2], styles['Normal']),               # Publikasi Relevan
+                Paragraph(r[3], styles['Normal'])                # Pernah Diajar
+            ])
+
+        col_widths = [120, 80, 250, 60]  # bisa disesuaikan
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.grey),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("GRID", (0,0), (-1,-1), 1, colors.black)
+        ]))
+        elements.append(table)
 
         doc.build(elements)
         pdf = buffer.getvalue()
