@@ -11,10 +11,16 @@ from io import BytesIO
 from dotenv import load_dotenv
 import os
 import requests
+import tomllib
 
-# --- Load API keys from .env ---
-load_dotenv()
-SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY")
+# # --- Load API keys from .env ---
+# load_dotenv()
+# SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY")
+
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+
+SCOPUS_API_KEY = config["scopus"]["api_key"]
 
 st.set_page_config(page_title="Profiling Dosen - Scholar, Sinta & Scopus", layout="wide")
 st.title("📚 Profiling Dosen (Google Scholar + Sinta + Scopus)")
