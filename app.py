@@ -142,7 +142,7 @@ with col2:
                         "Pernah Diajar": pernah_diajar
                     })
 
-            df_results = pd.DataFrame(results).sort_values("Kesesuaian (%)", ascending=False)
+            df_results = pd.DataFrame(results).sort_values("Pernah Diajar", ascending=False)
             st.subheader("🧑‍🏫 Rekomendasi Mata Kuliah")
             st.dataframe(df_results)
 
