@@ -143,7 +143,18 @@ with col3:
             pdf = buffer.getvalue()
             buffer.close()
 
-            st.download_button("⬇️ Download PDF", data=pdf, file_name="profil_dosen.pdf", mime="application/pdf")
+            # --- Generate dynamic filename ---
+            def slugify(text):
+                return text.lower().replace(" ", "_")
+
+            if author:
+                nama_slug = slugify(author['name'])
+                prodi_slug = slugify(prodi)
+                filename = f"profil_dosen_{nama_slug}_{prodi_slug}.pdf"
+            else:
+                filename = "profil_dosen.pdf"
+
+            st.download_button("⬇️ Download PDF", data=pdf, file_name=filename, mime="application/pdf")
 
         except Exception as e:
             st.error(f"Gagal mapping mata kuliah: {e}")
