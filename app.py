@@ -120,6 +120,7 @@ if not df_existing.empty:
     # Tabel ringkas
     st.dataframe(df_filtered[["name","prodi","scholar_id","h_index","i10_index"]])
 
+    to_delete = None
     # 🔽 Detail per dosen dalam collapse (expander)
     for idx, row in df_filtered.iterrows():
         with st.expander(f"👤 {row['name']} - {row['prodi']}"):
@@ -139,12 +140,30 @@ if not df_existing.empty:
                 "i10index": row['i10_index']
             }
             pdf_bytes = generate_pdf(row['name'], row['prodi'], author_data, bidang_df, mk_df)
+            
             st.download_button(
                 f"⬇️ Download PDF {row['name']}",
-                data=pdf_bytes,
-                file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(row['prodi'])}.pdf",
-                mime="application/pdf"
+                    data=pdf_bytes,
+                    file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(row['prodi'])}.pdf",
+                    mime="application/pdf"
             )
+
+            # 🗑️ Tombol delete
+            if st.button(f"🗑️ Hapus {row['name']}", key=f"delete_{idx}"):
+                c.execute("DELETE FROM profil_dosen WHERE name=? AND prodi=?", (row['name'], row['prodi']))
+                conn.commit()
+                to_delete = idx  # tandai row yang dihapus
+                st.session_state["deleted"] = row['name']
+
+            # ✅ Tampilkan notifikasi delete sekali
+            if "deleted" in st.session_state:
+                st.success(f"✅ Data {st.session_state['deleted']} berhasil dihapus")
+                del st.session_state["deleted"]
+
+            # 🔄 Hapus dari dataframe in-memory supaya langsung hilang dari UI
+            if to_delete is not None:
+                df_filtered = df_filtered.drop(to_delete).reset_index(drop=True)
+            
 else:
     st.info("Belum ada data dosen yang diproses.")
 
@@ -228,7 +247,7 @@ if uploaded_file and proses:
             continue
 
         # --- proses profiling baru ---
-            st.markdown(f"## 👤 {row['name']} - {row['prodi']}")
+        st.markdown(f"## 👤 {row['name']} - {row['prodi']}")
         scholar_id = row['scholar_id']
         sim_url = row['sim_url']
         prodi = row['prodi']
@@ -326,8 +345,8 @@ if uploaded_file and proses:
         # --- Generate PDF ---
         pdf_bytes = generate_pdf(row['name'], prodi, author if author else {"name":row['name']}, df_fields, df_results)
         st.download_button(f"⬇️ Download PDF {row['name']}", data=pdf_bytes,
-                           file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(prodi)}.pdf",
-                           mime="application/pdf")
+                            file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(prodi)}.pdf",
+                            mime="application/pdf")
 
         # --- Simpan ke SQLite ---
         c.execute("""
