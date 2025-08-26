@@ -22,9 +22,10 @@ col1, col2 = st.columns([1, 4])
 with col1:
     st.subheader("📝 Input Identitas Dosen")
     scholar_id = st.text_input("Google Scholar ID:", placeholder="UN80ApgAAAAJ")
-    sim_url = st.text_input("URL SIM UEU Profil Dosen:", placeholder="https://simueu.esaunggul.ac.id/ueu/sdm/index.php?page=data_dosen&key=XXXXX")
+    sim_url = st.text_input("URL SIM UEU Profil Dosen:", 
+                            placeholder="https://simueu.esaunggul.ac.id/ueu/sdm/index.php?page=data_dosen&key=XXXXX")
 
-    # Mata kuliah per prodi (contoh singkat)
+    # Mata kuliah per prodi
     courses_TI = ["Algoritma dan Pemrograman","Aljabar Linier dan Matriks","Analisis dan Perancangan Sistem Informasi",
                   "Arsitektur Berbasis Layanan","Arsitektur Enterprise","Bahasa Pemrograman","Basis Data","Big Data",
                   "Cyber Security","Dasar Sistem Informasi","Data Mining","Data Warehouse","Desain dan Analisis Algoritma",
@@ -77,24 +78,28 @@ publications_texts = []
 if proses and scholar_id:
     try:
         author = scholarly.search_author_id(scholar_id)
-        author = scholarly.fill(author, sections=["basics","indices","counts","publications"])
+        if not author:
+            st.error("⚠️ Google Scholar ID tidak valid atau tidak ditemukan")
+        else:
+            author = scholarly.fill(author, sections=["basics","indices","counts","publications"])
 
-        st.subheader("📖 Google Scholar")
-        st.write(f"👤 **{author.get('name','-')}**")
-        st.write(f"🏫 {author.get('affiliation','-')}")
-        st.write(f"📊 h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}")
-        st.write(f"🌐 Bidang: {', '.join(author.get('interests', []))}")
+            st.subheader("📖 Google Scholar")
+            st.write(f"👤 **{author.get('name','-')}**")
+            st.write(f"🏫 {author.get('affiliation','-')}") 
+            st.write(f"📊 h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}")
+            st.write(f"🌐 Bidang: {', '.join(author.get('interests', []))}")
 
-        competency_text = " ".join(author.get("interests", []))
-        for pub in author["publications"][:20]:
-            try:
-                pub_filled = scholarly.fill(pub)
-                title = pub_filled['bib'].get('title', "")
-                abstract = pub_filled['bib'].get('abstract', "")
-                publications_texts.append(title)
-                competency_text += " " + title + " " + abstract
-            except:
-                pass
+            competency_text = " ".join(author.get("interests", []))
+
+            for pub in author.get("publications", [])[:20]:
+                try:
+                    pub_filled = scholarly.fill(pub)
+                    title = pub_filled['bib'].get('title', "")
+                    abstract = pub_filled['bib'].get('abstract', "")
+                    publications_texts.append(title)
+                    competency_text += " " + title + " " + abstract
+                except Exception:
+                    pass
     except Exception as e:
         st.error(f"⚠️ Gagal ambil data Google Scholar: {e}")
 
@@ -108,7 +113,7 @@ if proses and sim_url:
         if pengajaran_div:
             table = pengajaran_div.find_next("table", {"class":"GridStyle"})
             if table:
-                rows = table.find_all("tr")[1:]  # skip header
+                rows = table.find_all("tr")[1:]
                 for row in rows:
                     cols = row.find_all("td")
                     if len(cols) >= 3:
@@ -119,6 +124,46 @@ if proses and sim_url:
             st.warning("⚠️ Bagian 'Pengajaran' tidak ditemukan")
     except Exception as e:
         st.error(f"Gagal ambil riwayat mengajar SIM UEU: {e}")
+
+# ================== Mapping Bidang Keilmuan ==================
+fields_mapping = {
+    "Software Engineering": ["software engineering", "software development", "software testing",
+                             "requirements engineering", "software quality", "SQA", "program analysis"],
+    "Artificial Intelligence": ["artificial intelligence", "machine learning", "deep learning",
+                                "neural networks", "computer vision", "natural language processing", "AI"],
+    "Networking": ["network", "computer networks", "wireless", "5G", "network security",
+                   "network protocols", "SDN", "IoT networks"],
+    "Internet of Things": ["internet of things", "IoT", "embedded systems", "cyber physical systems",
+                           "sensor networks", "smart devices"],
+    "Enterprise Architecture": ["enterprise architecture", "enterprise system", "ERP",
+                                "business process", "enterprise integration", "SOA"],
+    "Information Systems": ["information systems", "IS", "business intelligence",
+                            "knowledge management", "IT governance", "E-Business"],
+    "Cyber Security": ["cybersecurity", "information security", "cryptography",
+                       "malware", "intrusion detection", "digital forensics"],
+    "Data Science": ["data science", "data mining", "big data", "analytics", "statistics"]
+}
+
+field_results = []
+if proses and competency_text:
+    try:
+        for field, keywords in fields_mapping.items():
+            field_text = " ".join(keywords)
+            sim = cosine_similarity(
+                TfidfVectorizer().fit_transform([competency_text, field_text])
+            )[0,1]
+            field_results.append({
+                "Bidang Ilmu": field,
+                "Kesesuaian (%)": round(sim*100)
+            })
+
+        df_fields = pd.DataFrame(field_results).sort_values("Kesesuaian (%)", ascending=False)
+
+        st.subheader("🔬 Mapping Bidang Keilmuan")
+        st.dataframe(df_fields)
+
+    except Exception as e:
+        st.error(f"Gagal mapping bidang keilmuan: {e}")
 
 # --- Mapping dan Rekomendasi Mata Kuliah ---
 if proses and competency_text:
@@ -156,25 +201,38 @@ if proses and competency_text:
         elements = []
 
         # Judul
-        elements.append(Paragraph("Profil Dosen: Nama Dosen", styles['Title']))
+        elements.append(Paragraph(f"Profil Dosen: {author.get('name','-')}", styles['Title']))
         elements.append(Spacer(1,12))
-        elements.append(Paragraph("Afiliasi: Fakultas / Universitas", styles['Normal']))
-        elements.append(Paragraph("h-index: 10 | i10-index: 5", styles['Normal']))
+        elements.append(Paragraph(f"Afiliasi: {author.get('affiliation','-')}", styles['Normal']))
+        elements.append(Paragraph(f"h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}", styles['Normal']))
         elements.append(Spacer(1,12))
 
-        # Table Data
+        # Table Bidang Ilmu
+        elements.append(Paragraph("Bidang Keilmuan", styles['Heading2']))
+        field_table_data = [["Bidang Ilmu", "Kesesuaian (%)"]]
+        for r in df_fields.itertuples(index=False):
+            field_table_data.append([r[0], str(r[1])])
+        field_table = Table(field_table_data, colWidths=[200,100], repeatRows=1)
+        field_table.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.grey),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.whitesmoke),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("GRID", (0,0), (-1,-1), 1, colors.black)
+        ]))
+        elements.append(field_table)
+        elements.append(Spacer(1,12))
+
+        # Table Mata Kuliah
+        elements.append(Paragraph("Rekomendasi Mata Kuliah", styles['Heading2']))
         table_data = [["Mata Kuliah", "Kesesuaian (%)", "Publikasi Relevan", "Pernah Diajar"]]
-
-        # Contoh row
         for r in df_results.itertuples(index=False):
             table_data.append([
-                Paragraph(r[0], styles['Normal']),                # Mata Kuliah
-                Paragraph(str(r[1]), styles['Normal']),          # Kesesuaian
-                Paragraph(r[2], styles['Normal']),               # Publikasi Relevan
-                Paragraph(r[3], styles['Normal'])                # Pernah Diajar
+                Paragraph(r[0], styles['Normal']),
+                Paragraph(str(r[1]), styles['Normal']),
+                Paragraph(r[2], styles['Normal']),
+                Paragraph(r[3], styles['Normal'])
             ])
-
-        col_widths = [120, 80, 250, 60]  # bisa disesuaikan
+        col_widths = [120, 80, 250, 60]
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
             ("BACKGROUND", (0,0), (-1,0), colors.grey),
