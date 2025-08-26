@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import json
+import os
 
 st.set_page_config(page_title="Profiling Dosen Fasilkom Esa Unggul", layout="wide")
 st.title("📚 Profiling Dosen Fasilkom Esa Unggul")
@@ -193,6 +194,14 @@ with st.sidebar:
     st.subheader("📂 Upload CSV Data Dosen")
     uploaded_file = st.file_uploader("Upload CSV (Kolom: name, scholar_id, sim_url, prodi)", type=["csv"])
     proses = st.button("🔍 Proses Profiling Semua Dosen")
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #     if st.button("🔍 Analisa Bidang Ilmu"):
+    #         st.switch_page("pages/analisa_bidang_ilmu.py")
+
+    # with col2:
+    #     if st.button("📘 Analisa Mata Kuliah"):
+    #         st.switch_page("pages/analisa_mata_kuliah.py")
 
 if uploaded_file and proses:
     df_dosen = pd.read_csv(uploaded_file)
