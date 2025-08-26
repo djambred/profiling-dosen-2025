@@ -188,12 +188,20 @@ if uploaded_file and proses:
     }
 
     for idx, row in df_dosen.iterrows():
-        # Skip jika scholar_id kosong
+    # Skip jika scholar_id kosong
         if pd.isna(row['scholar_id']) or not str(row['scholar_id']).strip():
             st.warning(f"⚠️ Dosen {row['name']} dilewati karena scholar_id kosong")
             continue
 
-        st.markdown(f"## 👤 {row['name']} - {row['prodi']}")
+    # 🔎 Cek apakah sudah ada di database
+        c.execute("SELECT id FROM profil_dosen WHERE name=? AND prodi=?", (row['name'], row['prodi']))
+        existing = c.fetchone()
+        if existing:
+            st.info(f"⏩ {row['name']} ({row['prodi']}) sudah ada di database, dilewati...")
+            continue
+
+        # --- proses profiling baru ---
+            st.markdown(f"## 👤 {row['name']} - {row['prodi']}")
         scholar_id = row['scholar_id']
         sim_url = row['sim_url']
         prodi = row['prodi']
