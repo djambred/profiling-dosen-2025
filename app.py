@@ -97,33 +97,54 @@ def generate_pdf(name, prodi, author, df_fields, df_results):
     buffer.close()
     return pdf
 
+
 # ================= Load Existing Data =================
 st.subheader("📋 Data Dosen yang Sudah Terproses")
 df_existing = pd.read_sql("SELECT * FROM profil_dosen", conn)
 
 if not df_existing.empty:
-    st.dataframe(df_existing[["name","prodi","scholar_id","h_index","i10_index"]])
-    for idx, row in df_existing.iterrows():
-        st.markdown(f"### 👤 {row['name']} - {row['prodi']}")
-        bidang_df = pd.DataFrame(json.loads(row['bidang_keilmuan']))
-        mk_df = pd.DataFrame(json.loads(row['rekomendasi_mk']))
+    # 🔎 Search dosen
+    search_query = st.text_input("Cari dosen berdasarkan nama:")
 
-        st.markdown("**🔬 Bidang Keilmuan (Top 5)**")
-        st.table(bidang_df.head(5))
+    # 🎓 Filter per prodi
+    prodi_list = ["Semua"] + sorted(df_existing["prodi"].dropna().unique().tolist())
+    selected_prodi = st.selectbox("Filter berdasarkan Prodi:", prodi_list)
 
-        st.markdown("**🧑‍🏫 Rekomendasi Mata Kuliah**")
-        st.dataframe(mk_df)
+    # 🔍 Apply filter
+    df_filtered = df_existing.copy()
+    if search_query:
+        df_filtered = df_filtered[df_filtered["name"].str.contains(search_query, case=False, na=False)]
+    if selected_prodi != "Semua":
+        df_filtered = df_filtered[df_filtered["prodi"] == selected_prodi]
 
-        author_data = {
-            "name": row['name'],
-            "affiliation": "-",
-            "hindex": row['h_index'],
-            "i10index": row['i10_index']
-        }
-        pdf_bytes = generate_pdf(row['name'], row['prodi'], author_data, bidang_df, mk_df)
-        st.download_button(f"⬇️ Download PDF {row['name']}", data=pdf_bytes,
-                           file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(row['prodi'])}.pdf",
-                           mime="application/pdf")
+    # Tabel ringkas
+    st.dataframe(df_filtered[["name","prodi","scholar_id","h_index","i10_index"]])
+
+    # 🔽 Detail per dosen dalam collapse (expander)
+    for idx, row in df_filtered.iterrows():
+        with st.expander(f"👤 {row['name']} - {row['prodi']}"):
+            bidang_df = pd.DataFrame(json.loads(row['bidang_keilmuan']))
+            mk_df = pd.DataFrame(json.loads(row['rekomendasi_mk']))
+
+            st.markdown("**🔬 Bidang Keilmuan (Top 5)**")
+            st.table(bidang_df.head(5))
+
+            st.markdown("**🧑‍🏫 Rekomendasi Mata Kuliah**")
+            st.dataframe(mk_df)
+
+            author_data = {
+                "name": row['name'],
+                "affiliation": "-",
+                "hindex": row['h_index'],
+                "i10index": row['i10_index']
+            }
+            pdf_bytes = generate_pdf(row['name'], row['prodi'], author_data, bidang_df, mk_df)
+            st.download_button(
+                f"⬇️ Download PDF {row['name']}",
+                data=pdf_bytes,
+                file_name=f"profil_dosen_{slugify(row['name'])}_{slugify(row['prodi'])}.pdf",
+                mime="application/pdf"
+            )
 else:
     st.info("Belum ada data dosen yang diproses.")
 
@@ -135,6 +156,9 @@ with st.sidebar:
 
 if uploaded_file and proses:
     df_dosen = pd.read_csv(uploaded_file)
+    progress_bar = st.sidebar.progress(0)
+    status_text = st.sidebar.empty()
+    total_dosen = len(df_dosen)
 
     # Mata kuliah per prodi
     courses_TI = ["Algoritma dan Pemrograman","Aljabar Linier dan Matriks","Analisis dan Perancangan Sistem Informasi",
@@ -188,6 +212,9 @@ if uploaded_file and proses:
     }
 
     for idx, row in df_dosen.iterrows():
+        progress = int((idx + 1) / total_dosen * 100)
+        status_text.text(f"⏳ Memproses {row['name']} ({idx+1}/{total_dosen})...")
+        progress_bar.progress(progress)
     # Skip jika scholar_id kosong
         if pd.isna(row['scholar_id']) or not str(row['scholar_id']).strip():
             st.warning(f"⚠️ Dosen {row['name']} dilewati karena scholar_id kosong")
@@ -207,6 +234,8 @@ if uploaded_file and proses:
         prodi = row['prodi']
 
         if prodi == "Teknik Informatika":
+            courses = courses_TI
+        elif prodi == "Teknik Informatika (PJJ)":
             courses = courses_TI
         elif prodi == "Sistem Informasi":
             courses = courses_SI
@@ -316,3 +345,5 @@ if uploaded_file and proses:
             df_results.to_json(orient="records")
         ))
         conn.commit()
+        status_text.text("✅ Semua dosen berhasil diproses!")
+        progress_bar.empty()
