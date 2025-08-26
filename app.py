@@ -3,14 +3,14 @@ import pandas as pd
 import sqlite3
 from io import BytesIO
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+import textwrap
 from scholarly import scholarly
 import requests
 from bs4 import BeautifulSoup
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import textwrap
 import json
 
 st.set_page_config(page_title="Profiling Dosen Fasilkom Esa Unggul", layout="wide")
@@ -38,29 +38,40 @@ conn.commit()
 def slugify(text):
     return text.lower().replace(" ", "_")
 
-def wrap_text(text, width=50):
+def wrap_text(text, per_word=False, width=50):
     if not text:
         return ""
-    return "\n".join(textwrap.wrap(str(text), width=width))
+    text = str(text)
+    if per_word:
+        return "<br/>".join(text.split())  # setiap kata jadi baris baru
+    return "<br/>".join(textwrap.wrap(text, width=width))  # default wrap per panjang
 
+
+# ================= Main PDF Generator =================
 def generate_pdf(name, prodi, author, df_fields, df_results):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=(595,842), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
     styles = getSampleStyleSheet()
+    styleN = styles["Normal"]
+    wrap_style = ParagraphStyle("wrap", parent=styleN, leading=12)
+
     elements = []
 
     # Judul
     elements.append(Paragraph(f"Profil Dosen: {author.get('name','-')}", styles['Title']))
     elements.append(Spacer(1,12))
-    elements.append(Paragraph(f"Afiliasi: {author.get('affiliation','-')}", styles['Normal']))
-    elements.append(Paragraph(f"h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}", styles['Normal']))
+    elements.append(Paragraph(f"Afiliasi: {author.get('affiliation','-')}", styleN))
+    elements.append(Paragraph(f"h-index: {author.get('hindex','-')} | i10-index: {author.get('i10index','-')}", styleN))
     elements.append(Spacer(1,12))
 
-    # Bidang Keilmuan
+    # ================= Bidang Keilmuan =================
     elements.append(Paragraph("Bidang Keilmuan", styles['Heading2']))
     field_table_data = [["Bidang Ilmu", "Kesesuaian (%)"]]
     for r in df_fields.itertuples(index=False):
-        field_table_data.append([wrap_text(r[0],30), str(r[1])])
+        field_table_data.append([
+            Paragraph(wrap_text(r[0], width=30), wrap_style),
+            str(r[1])
+        ])
     field_table = Table(field_table_data, colWidths=[200,100], repeatRows=1)
     field_table.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,0), colors.grey),
@@ -72,15 +83,15 @@ def generate_pdf(name, prodi, author, df_fields, df_results):
     elements.append(field_table)
     elements.append(Spacer(1,12))
 
-    # Mata Kuliah
+    # ================= Rekomendasi Mata Kuliah =================
     elements.append(Paragraph("Rekomendasi Mata Kuliah", styles['Heading2']))
     table_data = [["Mata Kuliah", "Kesesuaian(%)", "Publikasi Relevan", "Pernah Diajar"]]
     for r in df_results.itertuples(index=False):
         table_data.append([
-            wrap_text(r[0], 30),
+            Paragraph(wrap_text(r[0], per_word=True), wrap_style),   # Mata kuliah → turun per kata
             str(r[1]),
-            wrap_text(r[2], 50),
-            r[3]
+            Paragraph(wrap_text(r[2], width=50), wrap_style),        # Publikasi → wrap panjang
+            str(r[3])
         ])
     table = Table(table_data, colWidths=[150, 80, 300, 70], repeatRows=1)
     table.setStyle(TableStyle([
@@ -92,6 +103,7 @@ def generate_pdf(name, prodi, author, df_fields, df_results):
     ]))
     elements.append(table)
 
+    # ================= Build PDF =================
     doc.build(elements)
     pdf = buffer.getvalue()
     buffer.close()
@@ -121,6 +133,10 @@ if not df_existing.empty:
     st.dataframe(df_filtered[["name","prodi","scholar_id","h_index","i10_index"]])
 
     to_delete = None
+    ADMIN_PASS = "djambred"
+    st.sidebar.markdown("### 🔑 Admin Panel")
+    admin_pwd = st.sidebar.text_input("Password Admin", type="password", key="admin_pwd")
+    is_admin = admin_pwd == ADMIN_PASS
     # 🔽 Detail per dosen dalam collapse (expander)
     for idx, row in df_filtered.iterrows():
         with st.expander(f"👤 {row['name']} - {row['prodi']}"):
@@ -148,24 +164,29 @@ if not df_existing.empty:
                     mime="application/pdf"
             )
 
-            # 🗑️ Tombol delete
-            if st.button(f"🗑️ Hapus {row['name']}", key=f"delete_{idx}"):
-                c.execute("DELETE FROM profil_dosen WHERE name=? AND prodi=?", (row['name'], row['prodi']))
-                conn.commit()
-                to_delete = idx  # tandai row yang dihapus
-                st.session_state["deleted"] = row['name']
+            # 🗑️ Bagian delete dengan password konfirmasi
+            # 🗑️ Tombol delete (aktif hanya jika password admin benar)
+            if is_admin:
+                if st.button(f"🗑️ Hapus {row['name']}", key=f"delete_{idx}"):
+                    c.execute("DELETE FROM profil_dosen WHERE name=? AND prodi=?", (row['name'], row['prodi']))
+                    conn.commit()
+                    to_delete = idx
+                    st.session_state["deleted"] = row['name']
+            else:
+                st.info("🔒 Masukkan password admin di sidebar untuk bisa menghapus data.")
 
-            # ✅ Tampilkan notifikasi delete sekali
-            if "deleted" in st.session_state:
-                st.success(f"✅ Data {st.session_state['deleted']} berhasil dihapus")
-                del st.session_state["deleted"]
 
-            # 🔄 Hapus dari dataframe in-memory supaya langsung hilang dari UI
-            if to_delete is not None:
-                df_filtered = df_filtered.drop(to_delete).reset_index(drop=True)
+        # ✅ Notifikasi delete sekali
+        if "deleted" in st.session_state:
+            st.success(f"✅ Data {st.session_state['deleted']} berhasil dihapus")
+            del st.session_state["deleted"]
+
+        # 🔄 Hapus dari dataframe in-memory
+        if to_delete is not None:
+            df_filtered = df_filtered.drop(to_delete).reset_index(drop=True)
             
-else:
-    st.info("Belum ada data dosen yang diproses.")
+    else:
+        st.info("Belum ada data dosen yang diproses.")
 
 # ================= Upload CSV Baru =================
 with st.sidebar:
