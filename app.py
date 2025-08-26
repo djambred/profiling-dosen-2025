@@ -280,7 +280,13 @@ if uploaded_file and proses:
                     "Publikasi Relevan": "; ".join(top_pub_titles),
                     "Pernah Diajar": pernah_diajar
                 })
-        df_results = pd.DataFrame(results).sort_values("Pernah Diajar", ascending=False)
+        df_results = pd.DataFrame(results)
+
+        if not df_results.empty and "Pernah Diajar" in df_results.columns:
+            df_results = df_results.sort_values("Pernah Diajar", ascending=False)
+        else:
+            # fallback: buat DataFrame kosong dengan kolom sesuai kebutuhan
+            df_results = pd.DataFrame(columns=["Mata Kuliah", "Kesesuaian (%)", "Publikasi Relevan", "Pernah Diajar"])
 
         # --- Tampilkan detail ---
         st.markdown("**🔬 Bidang Keilmuan**")
