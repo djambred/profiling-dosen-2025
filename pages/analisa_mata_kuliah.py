@@ -20,7 +20,7 @@ for _, row in df.iterrows():
                     "Nama Dosen": row["name"],
                     "Prodi": row["prodi"],
                     "Mata Kuliah": mk.get("Mata Kuliah", ""),
-                    "Kesesuaian (%)": mk.get("Kesesuaian(%)", ""),
+                    "Kesesuaian (%)": mk.get("Kesesuaian (%)", ""),
                     "Publikasi Relevan": mk.get("Publikasi Relevan", ""),
                     "Pernah Diajar": mk.get("Pernah Diajar", "")
                 })
