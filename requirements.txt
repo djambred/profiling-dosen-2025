@@ -7,3 +7,4 @@ reportlab>=3.6.12
 requests>=2.31.0
 toml>=0.10.2
 beautifulsoup4>=4.12.2
+bibtexparser==1.4.3
